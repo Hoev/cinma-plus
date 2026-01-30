@@ -1,620 +1,538 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>سينما المنزل - PRO</title>
-    <style>
-        :root {
-            --primary: #e50914;
-            --focus: #fff;
-            --bg: #141414;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Cinema PLUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 
-        body {
-            margin: 0;
-            background-color: var(--bg);
-            color: #fff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow-x: hidden;
-            scroll-behavior: smooth;
-        }
+<style>
+/* === الأساسيات === */
+:root { --bg: #000; --gold: #FFC107; --text: #fff; --gray: #1a1a1a; --safe-top: env(safe-area-inset-top); --safe-bot: env(safe-area-inset-bottom); }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; -webkit-tap-highlight-color: transparent; outline: none; user-select: none; }
+body { background-color: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* === الخلفية === */
-        #home-background {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            opacity: 0.2;
-            z-index: -1;
-            filter: grayscale(100%) blur(3px);
-            pointer-events: none;
-        }
-        .bg-poster { width: 100%; height: auto; opacity: 0.5; }
+/* === التحميل === */
+#global-loader {
+    position: fixed; inset: 0; background: #000; 
+    z-index: 90; display: flex; justify-content: center; align-items: center;
+    transition: opacity 0.3s ease; pointer-events: none;
+}
+.spinner { width: 50px; height: 50px; border: 5px solid #333; border-top: 5px solid var(--gold); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* === القائمة العلوية === */
-        #top-nav {
-            position: sticky;
-            top: 0;
-            width: 100%;
-            padding: 15px;
-            background: rgba(20, 20, 20, 0.95);
-            backdrop-filter: blur(10px);
-            display: none;
-            z-index: 50;
-            text-align: center;
-            border-bottom: 1px solid #333;
-        }
+/* === الهيدر === */
+.mobile-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; padding-top: calc(10px + var(--safe-top)); background: linear-gradient(to bottom, #000, transparent); width: 100%; position: absolute; top: 0; z-index: 50; pointer-events: none; }
+.mobile-header svg, .mobile-header .page-title { pointer-events: auto; }
+.page-title { font-size: 22px; font-weight: 800; text-shadow: 0 2px 5px rgba(0,0,0,0.8); }
 
-        .filter-btn {
-            background: transparent;
-            border: none;
-            color: #aaa;
-            padding: 8px 20px;
-            font-size: 1rem;
-            margin: 0 5px;
-            cursor: pointer;
-            border-radius: 20px;
-            font-weight: bold;
-            transition: 0.3s;
-        }
-        .filter-btn.active { background: var(--primary); color: white; }
+/* === المحتوى === */
+#main-content { flex: 1; overflow-y: auto; padding-bottom: 90px; scroll-behavior: smooth; }
 
-        /* === تأثير التركيز (Focus) === */
-        .focused, .nav-item:focus {
-            transform: scale(1.05);
-            border: 3px solid var(--focus) !important;
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
-            z-index: 100;
-            background-color: #333;
-            outline: none;
-        }
-        
-        .chip.focused {
-            background-color: var(--primary) !important;
-            border-color: white !important;
-        }
+/* === الأقسام === */
+.section { display: none; opacity: 0; animation: fadeIn 0.3s forwards; }
+.section.active { display: block; opacity: 1; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* === شاشة البحث === */
-        .hero-section {
-            min-height: 80vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            transition: all 0.5s ease;
-        }
-        .hero-section.collapsed { min-height: auto; margin: 20px 0; display: none; }
+/* === السلايدر === */
+.slider-container { width: 100%; height: 50vh; position: relative; overflow: hidden; margin-bottom: 20px; }
+.slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity 0.5s; }
+.slide.active { opacity: 1; }
+.slide-overlay { position: absolute; inset: 0; background: linear-gradient(to top, var(--bg), transparent); display: flex; flex-direction: column; justify-content: flex-end; padding: 20px; align-items: flex-start; }
+.slide-title { font-size: 24px; font-weight: 800; margin-bottom: 10px; text-shadow: 0 2px 10px #000; text-align: right; }
+.slider-btn { background: var(--gold); color: #000; border: none; padding: 8px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; pointer-events: auto; }
 
-        #searchInput {
-            width: 90%;
-            max-width: 600px;
-            padding: 15px 25px;
-            font-size: 1.2rem;
-            border-radius: 50px;
-            border: 2px solid #333;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
+/* === القوائم والعناوين === */
+.sec-head { display: flex; justify-content: space-between; align-items: center; margin: 20px 15px 10px; }
+.sec-title { font-size: 18px; font-weight: 700; border-right: 4px solid var(--gold); padding-right: 10px; }
+.more-btn { color: var(--gold); background: none; border: none; font-size: 14px; font-weight: bold; }
 
-        /* === شبكة النتائج === */
-        .grid-container {
-            display: grid;
-            gap: 15px;
-            padding: 20px;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            padding-bottom: 50px;
-        }
+.h-list { display: flex; gap: 10px; overflow-x: auto; padding: 0 15px 15px; }
+.h-list::-webkit-scrollbar { display: none; }
 
-        .card {
-            border-radius: 8px;
-            overflow: hidden;
-            position: relative;
-            background: #222;
-            cursor: pointer;
-            transition: transform 0.2s;
-            aspect-ratio: 2/3;
-            border: 2px solid transparent;
-        }
-        .card img { width: 100%; height: 100%; object-fit: cover; }
+/* بوستر موحد */
+.poster-card { flex: 0 0 130px; position: relative; aspect-ratio: 2/3; border-radius: 10px; overflow: hidden; background: #1a1a1a; }
+.poster-card img { width: 100%; height: 100%; object-fit: cover; }
+.rating-badge { position: absolute; top: 5px; right: 5px; background: var(--gold); color: black; font-size: 10px; font-weight: 800; padding: 2px 5px; border-radius: 4px; }
 
-        /* === نافذة التفاصيل === */
-        #details-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--bg);
-            z-index: 100;
-            display: none;
-            overflow-y: auto;
-        }
+/* الشبكات */
+.networks-list { display: flex; gap: 10px; overflow-x: auto; padding: 0 15px 15px; }
+.networks-list::-webkit-scrollbar { display: none; }
+.network-card { flex: 0 0 80px; height: 80px; background: #1a1a1a; border-radius: 12px; display: flex; justify-content: center; align-items: center; border: 1px solid #333; padding: 10px; }
+.network-card img { width: 100%; height: 100%; object-fit: contain; }
 
-        .details-container {
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            gap: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+/* الشبكة (Grid) */
+.media-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px; }
+.load-more-btn { background: #222; color: #fff; border: 1px solid #333; padding: 10px 30px; border-radius: 20px; display: block; margin: 20px auto; width: fit-content; }
 
-        .details-poster {
-            width: 160px;
-            border-radius: 10px;
-            margin: 0 auto;
-            display: block;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
-        }
+/* === التفاصيل === */
+.full-view { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 200; overflow-y: auto; display: none; padding-bottom: 80px; }
+.view-head { padding: 15px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: rgba(0,0,0,0.8); z-index: 10; backdrop-filter: blur(10px); }
+.back-btn { background: none; border: none; color: #fff; font-size: 24px; transform: scaleX(-1); }
 
-        .details-info { text-align: center; }
-        .details-info h1 { margin: 10px 0; font-size: 1.5rem; }
-        .details-info p { font-size: 0.9rem; color: #ccc; line-height: 1.5; }
+.hero { width: 100%; height: 45vh; background-size: cover; background-position: center; position: relative; }
+.hero::after { content:''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent, var(--bg)); }
+.det-content { padding: 20px; margin-top: -60px; position: relative; z-index: 2; }
+.det-top { display: flex; gap: 15px; align-items: flex-end; }
+.det-poster { width: 110px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 5px 15px #000; }
 
-        .action-btn {
-            background: var(--primary);
-            color: white;
-            border: 2px solid transparent;
-            padding: 12px 30px;
-            font-size: 1.1rem;
-            border-radius: 8px;
-            margin-top: 15px;
-            width: 100%;
-            cursor: pointer;
-        }
+.main-btn { background: var(--gold); color: #000; border: none; padding: 12px; width: 100%; font-weight: bold; border-radius: 8px; margin-top: 15px; font-size: 16px; cursor: pointer; }
+.fav-btn { background: transparent; color: var(--gold); border: 1px solid var(--gold); padding: 12px; width: 100%; font-weight: bold; border-radius: 8px; margin-top: 10px; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; }
+.fav-btn.active { background: rgba(255, 193, 7, 0.2); }
+.fav-btn svg { width: 20px; fill: currentColor; }
 
-        /* === القوائم الأفقية (مواسم/حلقات) === */
-        .scroll-row {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding: 15px 5px;
-            scrollbar-width: none;
-        }
-        .scroll-row::-webkit-scrollbar { display: none; }
+/* شبكة الحلقات */
+.season-sel { width: 100%; padding: 10px; margin: 15px 0 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 8px; font-size: 16px; font-weight: bold; }
+.ep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; margin-top: 10px; }
+.ep-btn { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 12px 0; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
+.ep-btn:active, .ep-btn:hover { background: #333; border-color: var(--gold); color: var(--gold); }
 
-        .chip {
-            background: #333;
-            padding: 10px 25px;
-            border-radius: 20px;
-            white-space: nowrap;
-            font-size: 1rem;
-            flex-shrink: 0;
-            cursor: pointer;
-            border: 2px solid transparent;
-            user-select: none;
-        }
+.desc-box { color: #ccc; margin-top: 15px; font-size: 14px; line-height: 1.6; max-height: 80px; overflow: hidden; transition: 0.3s; }
+.desc-box.open { max-height: 1000px; }
+.read-more { color: var(--gold); font-size: 12px; font-weight: bold; margin-top: 5px; display: inline-block; cursor: pointer; }
 
-        /* === المشغل === */
-        #fullscreen-player {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: black;
-            z-index: 200;
-            display: none;
-        }
-        
-        #video-frame {
-            width: 100%; height: 100%; border: none;
-        }
-        
-        /* تعديل زر الإغلاق ليختفي بتأثير ناعم */
-        #close-player {
-            position: absolute;
-            top: 20px; right: 20px;
-            background: rgba(255,255,255,0.1);
-            color: white;
-            width: 50px; height: 50px;
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: bold;
-            font-size: 20px;
-            cursor: pointer;
-            z-index: 201;
-            border: 2px solid white;
-            /* الإضافة: تأثير الانتقال */
-            transition: opacity 0.5s ease, visibility 0.5s;
-            opacity: 1;
-            visibility: visible;
-        }
-        #close-player:focus { background: var(--primary); }
+/* الإعدادات */
+.settings-head { padding: 40px 20px; text-align: center; background: linear-gradient(#1a1a1a, transparent); margin-bottom: 20px; border-radius: 0 0 20px 20px; }
+.avatar { width: 80px; height: 80px; background: #333; border-radius: 50%; margin: 0 auto 15px; display: flex; justify-content: center; align-items: center; font-size: 35px; border: 2px solid var(--gold); color: #fff; }
+.set-row { background: #1a1a1a; color: #fff; width: 100%; padding: 15px; border: 1px solid #333; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.logout-btn { background: #d32f2f; color: white; border: none; padding: 12px; width: 100%; border-radius: 10px; margin-top: 20px; cursor: pointer; font-weight: bold; display: none; }
 
-        /* كلاس لإخفاء الزر ومنع اعتراض اللمس */
-        .hidden-btn {
-            opacity: 0 !important;
-            visibility: hidden;
-            pointer-events: none; /* يسمح بالضغط على ما خلف الزر */
-        }
+/* المودالات */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 500; display: none; flex-direction: column; justify-content: center; align-items: center; }
+.modal-box { width: 85%; background: #111; padding: 25px; border-radius: 15px; border: 1px solid #333; text-align: center; }
+.inp { width: 100%; padding: 15px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 8px; outline: none; }
+.modal-act-btn { width: 100%; padding: 12px; background: var(--gold); color: #000; font-weight: bold; border-radius: 8px; border: none; margin-top: 10px; cursor: pointer; }
+.modal-link { color: #aaa; margin-top: 15px; font-size: 13px; text-decoration: underline; cursor: pointer; display: block; }
+.close-txt { margin-top: 20px; color: #777; cursor: pointer; display: block; }
 
-        /* الشاشات الكبيرة */
-        @media (min-width: 768px) {
-            .details-container {
-                flex-direction: row;
-                align-items: flex-start;
-                padding-top: 50px;
-                text-align: right;
-            }
-            .details-poster { width: 300px; margin: 0; }
-            .details-info { text-align: right; flex: 1; }
-            .action-btn { width: auto; display: inline-block; }
-            .grid-container { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 25px; }
-        }
-    </style>
+/* === السيرفرات والمشغل (تصميم جديد) === */
+#server-modal { z-index: 2000; }
+.server-box-scroll { width: 90%; max-width: 400px; max-height: 80vh; background: #111; padding: 20px; border-radius: 15px; border: 1px solid #333; display: flex; flex-direction: column; }
+.server-list-container { overflow-y: auto; padding-right: 5px; flex: 1; }
+/* ستايل السكرول */
+.server-list-container::-webkit-scrollbar { width: 5px; }
+.server-list-container::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 10px; }
+
+/* زر السيرفر مع التأثير الذهبي */
+.srv-btn { 
+    width: 100%; padding: 15px; margin: 8px 0; background: #222; border: 1px solid #444; 
+    color: #fff; border-radius: 10px; text-align: center; cursor: pointer; 
+    font-size: 16px; font-weight: bold; transition: 0.2s; position: relative; overflow: hidden;
+}
+.srv-btn:active, .srv-btn:focus {
+    background: var(--gold); color: #000; transform: scale(0.98); border-color: var(--gold);
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.5);
+}
+
+#player-overlay { position: fixed; inset: 0; background: #000; z-index: 3000; display: none; }
+#player-close { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; background: rgba(255,0,0,0.8); color: #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; border: 2px solid #fff; z-index: 3010; cursor: pointer; }
+iframe { width: 100%; height: 100%; border: none; }
+
+/* الناف بار */
+.nav { position: fixed; bottom: 0; left: 0; right: 0; background: #111; border-top: 1px solid #222; display: flex; justify-content: space-around; padding: 10px; z-index: 100; padding-bottom: calc(10px + var(--safe-bot)); }
+.nav-item { background: none; border: none; color: #666; display: flex; flex-direction: column; align-items: center; font-size: 11px; font-weight: 600; cursor: pointer; }
+.nav-item.active { color: var(--gold); }
+.nav-item svg { width: 24px; height: 24px; margin-bottom: 4px; fill: currentColor; }
+.search-box { display: flex; gap: 10px; margin: 15px; }
+</style>
 </head>
+<body onload="startApp()">
 
+<div id="global-loader"><div class="spinner"></div></div>
 
+<div id="main-content">
+    
+    <div id="home-sec" class="section active">
+        <div class="mobile-header">
+            <div class="page-title">CINEMA <span style="color:var(--gold)">PLUS</span></div>
+            <svg fill="white" width="24" height="24" viewBox="0 0 24 24" onclick="openSearch()"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path></svg>
+        </div>
 
+        <div class="slider-container" id="mainSlider"></div>
 
+        <div class="sec-head" style="margin-top:0;"><span class="sec-title">الشركات والشبكات</span></div>
+        <div class="networks-list">
+            <div class="network-card" onclick="openNet(213, 'Netflix')"><img src="https://image.tmdb.org/t/p/original/wwemzKWzjKYJFfCeiB57q3r4Bcm.png"></div>
+            <div class="network-card" onclick="openNet(1024, 'Amazon')"><img src="https://upload.wikimedia.org/wikipedia/commons/f/f1/Prime_Video.png"></div>
+            <div class="network-card" onclick="openNet(2739, 'Disney+')"><img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg"></div>
+            <div class="network-card" onclick="openNet(49, 'HBO')"><img src="https://image.tmdb.org/t/p/original/tuomPhY2UtuPTqqFnKMVHvSb724.png"></div>
+            <div class="network-card" onclick="openNet(453, 'Hulu')"><img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Hulu_Logo.svg"></div>
+        </div>
 
-
-<body>
-
-    <div id="home-background"></div>
-
-    <div id="top-nav">
-        <button class="filter-btn active nav-item" onclick="filterResults('all')">الكل</button>
-        <button class="filter-btn nav-item" onclick="filterResults('movie')">أفلام</button>
-        <button class="filter-btn nav-item" onclick="filterResults('tv')">مسلسلات</button>
-        <button class="filter-btn nav-item" onclick="resetSearch()" style="float:left; color:var(--primary)">بحث جديد</button>
+        <div class="sec-head"><span class="sec-title">أحدث الأفلام</span><button class="more-btn" onclick="navTo('movies')">المزيد</button></div>
+        <div class="h-list" id="home-movies"></div>
+        <div class="sec-head"><span class="sec-title">مسلسلات رائجة</span><button class="more-btn" onclick="navTo('series')">المزيد</button></div>
+        <div class="h-list" id="home-series"></div>
+        <div class="sec-head"><span class="sec-title">أنمي مختار</span><button class="more-btn" onclick="navTo('anime')">المزيد</button></div>
+        <div class="h-list" id="home-anime"></div>
     </div>
 
-    <div class="hero-section" id="hero">
-        <h1 style="margin-bottom: 20px;">سينما المنزل</h1>
-        <input type="text" id="searchInput" class="nav-item" placeholder="ابحث عن فيلم أو مسلسل..." autocomplete="off">
+    <div id="movies-sec" class="section">
+        <div class="sec-head"><span class="sec-title">كل الأفلام</span></div>
+        <div class="media-grid" id="all-movie-grid"></div><button class="load-more-btn" onclick="loadMore('movie')">المزيد</button>
     </div>
 
-    <div class="grid-container" id="resultsGrid"></div>
+    <div id="series-sec" class="section">
+        <div class="sec-head"><span class="sec-title">كل المسلسلات</span></div>
+        <div class="media-grid" id="all-series-grid"></div><button class="load-more-btn" onclick="loadMore('series')">المزيد</button>
+    </div>
 
-    <div id="details-overlay">
-        <div class="details-container">
-            <button id="btn-back" class="action-btn nav-item" onclick="closeDetails()" style="background:#333; width:auto; margin-bottom:10px;">رجوع ✖</button>
-            
-            <img id="d-poster" class="details-poster">
-            
-            <div class="details-info">
-                <h1 id="d-title">العنوان</h1>
-                <p id="d-desc">الوصف</p>
+    <div id="anime-sec" class="section">
+        <div class="sec-head"><span class="sec-title">كل الأنمي</span></div>
+        <div class="media-grid" id="all-anime-grid"></div><button class="load-more-btn" onclick="loadMore('anime')">المزيد</button>
+    </div>
 
-                <button id="btn-play" class="action-btn nav-item">▶ مشاهدة الآن</button>
-
-                <div id="series-area" style="display:none; margin-top:20px;">
-                    <h3 style="text-align: right; color:#888;">المواسم:</h3>
-                    <div id="seasons-list" class="scroll-row"></div>
-                    
-                    <h3 style="text-align: right; color:#888;">الحلقات:</h3>
-                    <div id="episodes-list" class="scroll-row"></div>
-                </div>
-            </div>
+    <div id="settings-sec" class="section">
+        <div class="settings-head">
+            <div class="avatar">👤</div>
+            <h3 id="user-name-display">زائر</h3>
+            <button class="modal-act-btn" style="width:auto; padding:10px 40px;" onclick="openAuth()" id="btn-login-main">تسجيل الدخول / إنشاء حساب</button>
+        </div>
+        <div style="padding:15px;">
+            <div class="set-row" onclick="openFavList()"><span>❤ قائمة مفضلتي</span><span>➜</span></div>
+            <button class="logout-btn" id="btn-logout" onclick="doLogout()">تسجيل خروج</button>
         </div>
     </div>
+</div>
 
-    <div id="fullscreen-player">
-        <div id="close-player" class="nav-item" onclick="closePlayer()" tabindex="0">X</div>
-        <iframe id="video-frame" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+<div id="fav-view" class="full-view">
+    <div class="view-head"><button class="back-btn" onclick="goBack()">➜</button> <span>مفضلتي</span></div>
+    <div class="sec-head"><span class="sec-title">أفلام</span></div><div class="h-list" id="fav-mov"><div class="empty-msg">فارغ</div></div>
+    <div class="sec-head"><span class="sec-title">مسلسلات</span></div><div class="h-list" id="fav-ser"><div class="empty-msg">فارغ</div></div>
+    <div class="sec-head"><span class="sec-title">أنمي</span></div><div class="h-list" id="fav-ani"><div class="empty-msg">فارغ</div></div>
+</div>
+
+<div id="search-view" class="full-view">
+    <div class="view-head"><button class="back-btn" onclick="goBack()">➜</button> <span>البحث</span></div>
+    <div class="search-box">
+        <input type="text" class="inp" id="searchInp" placeholder="ابحث..." style="margin:0">
+        <button onclick="performSearch()" class="modal-act-btn" style="width:auto; margin:0">بحث</button>
     </div>
+    <div class="sec-head"><span class="sec-title">أفلام</span></div><div class="media-grid" id="srch-mov"></div>
+    <div class="sec-head"><span class="sec-title">مسلسلات</span></div><div class="media-grid" id="srch-ser"></div>
+</div>
 
+<div id="net-view" class="full-view">
+    <div class="view-head"><button class="back-btn" onclick="goBack()">➜</button> <span id="net-tit"></span></div>
+    <div class="sec-head"><span class="sec-title">أفلام</span></div><div class="h-list" id="net-mov"></div>
+    <div class="sec-head"><span class="sec-title">مسلسلات</span></div><div class="h-list" id="net-ser"></div>
+</div>
 
+<div id="details-view" class="full-view">
+    <div class="view-head"><button class="back-btn" onclick="goBack()">➜</button></div>
+    <div id="details-con"></div>
+</div>
 
+<div id="player-overlay">
+    <div id="player-close" onclick="closePlayer()">✕</div>
+    <iframe id="player-frame" src="" allowfullscreen></iframe>
+</div>
 
+<div id="auth-modal" class="overlay">
+    <div class="modal-box" id="form-login">
+        <h2 style="color:var(--gold); margin-bottom:10px">تسجيل الدخول</h2>
+        <input type="email" id="log-email" class="inp" placeholder="البريد الإلكتروني">
+        <input type="password" id="log-pass" class="inp" placeholder="كلمة المرور">
+        <button class="modal-act-btn" onclick="loginUser()">دخول</button>
+        <div class="modal-link" onclick="toggleForms('register')">مستخدم جديد؟ إنشاء حساب</div>
+        <div class="close-txt" onclick="closeAuth()">إلغاء</div>
+    </div>
+    <div class="modal-box" id="form-register" style="display:none;">
+        <h2 style="color:var(--gold); margin-bottom:10px">إنشاء حساب</h2>
+        <input type="text" id="reg-name" class="inp" placeholder="الاسم الكامل">
+        <input type="email" id="reg-email" class="inp" placeholder="البريد الإلكتروني">
+        <input type="password" id="reg-pass" class="inp" placeholder="كلمة المرور">
+        <button class="modal-act-btn" onclick="registerUser()">إنشاء الحساب</button>
+        <div class="modal-link" onclick="toggleForms('login')">لديك حساب؟ تسجيل الدخول</div>
+        <div class="close-txt" onclick="closeAuth()">إلغاء</div>
+    </div>
+</div>
 
+<div id="server-modal" class="overlay" style="z-index: 1000;">
+    <div class="server-box-scroll">
+        <h3 style="color:#fff; margin-bottom:20px">اختر السيرفر</h3>
+        <div id="server-list" class="server-list-container"></div>
+        <div class="close-txt" style="margin-top:10px;" onclick="document.getElementById('server-modal').style.display='none'">إغلاق</div>
+    </div>
+</div>
 
+<nav class="nav">
+    <div class="nav-item active" onclick="navTo('home', this)"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path></svg><span>الرئيسية</span></div>
+    <div class="nav-item" onclick="navTo('movies', this)"><svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"></path></svg><span>أفلام</span></div>
+    <div class="nav-item" onclick="navTo('series', this)"><svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"></path></svg><span>مسلسلات</span></div>
+    <div class="nav-item" onclick="navTo('anime', this)"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"></path></svg><span>أنمي</span></div>
+    <div class="nav-item" onclick="navTo('settings', this)"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg><span>إعدادات</span></div>
+</nav>
 
+<script>
+// === تهيئة FIREBASE ===
+const firebaseConfig = {
+  apiKey: "AIzaSyBxT35NMrvWYPJRvWek_NKeu8QtNInISC4",
+  authDomain: "cinema-plus-d1238.firebaseapp.com",
+  projectId: "cinema-plus-d1238",
+  storageBucket: "cinema-plus-d1238.firebasestorage.app",
+  messagingSenderId: "659730944639",
+  appId: "1:659730944639:web:1c00b6f7118bf85bdde54a",
+  measurementId: "G-GHC58Z4YY6"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 
+const KEY='2694bcca3b367fc0da55d22b1c37e6de', BASE='https://api.themoviedb.org/3', IMG='https://image.tmdb.org/t/p/w500';
+let curTab='home-sec', pgs={movie:1, series:1, anime:1};
+let currentUser=null, favs={movie:[], tv:[], anime:[]};
 
-    <script>
-        const API_KEY = '2694bcca3b367fc0da55d22b1c37e6de';
-        const BASE_URL = 'https://api.themoviedb.org/3';
-        const IMG = 'https://image.tmdb.org/t/p/w500';
+// مراقبة حالة الحساب
+auth.onAuthStateChanged(user => {
+    if(user) {
+        currentUser = user;
+        document.getElementById('user-name-display').innerText = user.displayName || "مستخدم";
+        document.getElementById('btn-login-main').style.display = 'none';
+        document.getElementById('btn-logout').style.display = 'block';
+        if(localStorage.getItem('favs_'+user.uid)) favs=JSON.parse(localStorage.getItem('favs_'+user.uid));
+    } else {
+        currentUser = null;
+        document.getElementById('user-name-display').innerText = "زائر";
+        document.getElementById('btn-login-main').style.display = 'block';
+        document.getElementById('btn-logout').style.display = 'none';
+        favs={movie:[], tv:[], anime:[]};
+    }
+});
 
-        let appState = {
-            results: [],
-            currentFilter: 'all',
-            imdbId: null,
-            tmdbId: null
-        };
-        
-        let hideTimer = null; // متغير للمؤقت
+// === بدء التطبيق ===
+async function startApp() {
+    const l = document.getElementById('global-loader');
+    l.style.opacity='1'; 
+    setTimeout(() => { l.style.opacity='0'; setTimeout(()=>l.style.display='none', 300); }, 1000);
 
-        // 1. التهيئة
-        window.onload = async () => {
-            const res = await fetch(`${BASE_URL}/trending/all/week?api_key=${API_KEY}`);
-            const data = await res.json();
-            const bg = document.getElementById('home-background');
-            data.results.forEach(m => {
-                if(m.poster_path) {
-                    const img = document.createElement('img');
-                    img.src = IMG + m.poster_path;
-                    img.className = 'bg-poster';
-                    bg.appendChild(img);
-                }
-            });
-            document.getElementById('searchInput').focus();
-        };
+    initSlider();
+    fetchData('/movie/now_playing?language=ar-SA', 'home-movies', 'movie');
+    fetchData('/trending/tv/week?language=ar-SA', 'home-series', 'tv');
+    fetchData('/discover/tv?with_genres=16&language=ar-SA', 'home-anime', 'anime');
+    
+    loadMore('movie');
+    loadMore('series');
+    loadMore('anime');
 
-        // 2. البحث
-        const searchInput = document.getElementById('searchInput');
-        searchInput.addEventListener('keyup', async (e) => {
-            if (e.key === 'Enter' || e.target.value.length > 2) {
-                const query = searchInput.value;
-                if (query.length > 1) {
-                    document.getElementById('hero').classList.add('collapsed');
-                    document.getElementById('top-nav').style.display = 'block';
-                    
-                    const res = await fetch(`${BASE_URL}/search/multi?api_key=${API_KEY}&language=ar-SA&query=${query}`);
-                    const data = await res.json();
-                    appState.results = data.results;
-                    renderResults();
-                }
-            }
-        });
+    history.replaceState({v:'home'},'home');
+}
 
-        function resetSearch() {
-            document.getElementById('hero').classList.remove('collapsed');
-            document.getElementById('hero').style.display = 'flex';
-            document.getElementById('top-nav').style.display = 'none';
-            document.getElementById('resultsGrid').innerHTML = '';
-            searchInput.value = '';
-            searchInput.focus();
-        }
+// === السلايدر ===
+async function initSlider() {
+    try {
+        const d = await fetch(`${BASE}/trending/all/day?api_key=${KEY}&language=ar-SA`).then(r=>r.json());
+        document.getElementById('mainSlider').innerHTML = d.results.slice(0,5).map((i,x)=>
+            `<div class="slide ${x==0?'active':''}" style="background-image:url(https://image.tmdb.org/t/p/original${i.backdrop_path})"><div class="slide-overlay"><div class="slide-title">${i.title||i.name}</div><button class="slider-btn" onclick="openDet(${i.id},'${i.media_type}')">شاهد الآن ▶</button></div></div>`
+        ).join('');
+        setInterval(()=>{
+            const a=document.querySelector('.slide.active'); if(a){ a.classList.remove('active'); (a.nextElementSibling||document.querySelector('.slide')).classList.add('active'); }
+        }, 4000);
+    } catch(e){}
+}
 
-        // 3. عرض النتائج
-        function filterResults(type) {
-            appState.currentFilter = type;
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            renderResults();
-        }
+// === جلب البيانات ===
+async function fetchData(u, id, t, add=false) {
+    try {
+        const url = u.includes('api_key') ? u : `${BASE}${u}${u.includes('?')?'&':'?'}api_key=${KEY}`;
+        const d = await fetch(url).then(r=>r.json());
+        const h = d.results.map(i=> i.poster_path?`<div class="${id.includes('grid')?'poster-card':'poster-card'}" onclick="openDet(${i.id},'${t}')"><div class="rating-badge">${i.vote_average.toFixed(1)}</div><img src="${IMG+i.poster_path}"></div>`:'').join('');
+        const el = document.getElementById(id);
+        if(add) el.innerHTML+=h; else el.innerHTML=h;
+    } catch(e){}
+}
 
-        function renderResults() {
-            const grid = document.getElementById('resultsGrid');
-            grid.innerHTML = '';
-            
-            const filtered = appState.results.filter(item => {
-                if (appState.currentFilter === 'all') return true;
-                return item.media_type === appState.currentFilter;
-            });
+// === التفاصيل ===
+async function openDet(id, t) {
+    document.getElementById('details-view').style.display='block';
+    history.pushState({v:'det'},'det');
 
-            filtered.forEach(item => {
-                if (item.poster_path) {
-                    const card = document.createElement('div');
-                    card.className = 'card nav-item';
-                    card.tabIndex = 0; 
-                    card.innerHTML = `<img src="${IMG + item.poster_path}">`;
-                    card.onclick = () => openDetails(item);
-                    grid.appendChild(card);
-                }
-            });
-        }
+    let ft = t;
+    const pre = await fetch(`${BASE}/${t=='movie'?'movie':'tv'}/${id}?api_key=${KEY}`).then(r=>r.json());
+    if(t=='tv' && pre.genres.some(g=>g.id===16)) ft='anime';
 
-        // 4. التفاصيل
-        async function openDetails(item) {
-            const overlay = document.getElementById('details-overlay');
-            overlay.style.display = 'block';
-            
-            document.getElementById('d-poster').src = IMG + item.poster_path;
-            document.getElementById('d-title').innerText = item.title || item.name;
-            document.getElementById('d-desc').innerText = item.overview || 'لا يوجد وصف عربي';
-            
-            appState.tmdbId = item.id;
-            const type = item.media_type === 'movie' ? 'movie' : 'tv';
-            
-            const ext = await fetch(`${BASE_URL}/${type}/${item.id}/external_ids?api_key=${API_KEY}`);
-            const extData = await ext.json();
-            appState.imdbId = extData.imdb_id;
+    const d = await fetch(`${BASE}/${t=='movie'?'movie':'tv'}/${id}?api_key=${KEY}&language=ar-SA&append_to_response=external_ids`).then(r=>r.json());
+    const im = d.external_ids?.imdb_id;
+    const tm = d.id; // TMDB ID
+    const isF = checkFav(id, ft);
+    
+    let desc = d.overview || 'لا يوجد وصف متاح';
+    let dH = `<div class="desc-box" id="desc">${desc}</div>`;
+    if(desc.length>100) dH+=`<div class="read-more" onclick="document.getElementById('desc').classList.toggle('open')">عرض المزيد</div>`;
 
-            const btnPlay = document.getElementById('btn-play');
-            const seriesArea = document.getElementById('series-area');
+    let favTxt = isF ? '✔ مضاف للمفضلة' : '+ إضافة للمفضلة';
+    let favBtn = `<button class="fav-btn ${isF?'active':''}" onclick="togFav(${id},'${ft}','${d.title||d.name}','${d.poster_path}',this)">${favTxt}</button>`;
+    
+    let act = '';
+    if(t=='movie') {
+        act = `<button class="main-btn" onclick="srv('${im}', '${tm}', null, null)">مشاهدة الفيلم</button>${favBtn}`;
+    } else {
+        act = `${favBtn}
+               <select class="season-sel" onchange="eps(this.value,${id},'${im}', '${tm}')">${d.seasons.filter(s=>s.season_number>0).map(s=>`<option value="${s.season_number}">الموسم ${s.season_number}</option>`)}</select>
+               <div id="eps-list" class="ep-grid"></div>`;
+    }
 
-            document.getElementById('seasons-list').innerHTML = '';
-            document.getElementById('episodes-list').innerHTML = '';
+    document.getElementById('details-con').innerHTML = `
+    <div class="hero" style="background-image:url(https://image.tmdb.org/t/p/original${d.backdrop_path})"><div class="hero-over"></div></div>
+    <div class="det-content"><div class="det-top"><img src="${IMG+d.poster_path}" class="det-poster"><div><h2>${d.title||d.name}</h2></div></div>
+    ${dH} ${act}</div>`;
 
-            if (type === 'movie') {
-                seriesArea.style.display = 'none';
-                btnPlay.style.display = 'block';
-                btnPlay.onclick = () => playVideo('movie');
-                setTimeout(() => btnPlay.focus(), 100); 
-            } else {
-                btnPlay.style.display = 'none';
-                seriesArea.style.display = 'block';
-                await loadSeasons(item.id);
-            }
-        }
+    if(t!='movie' && d.seasons.length>0) eps(d.seasons.find(s=>s.season_number==1)?.season_number||1, id, im, tm);
+}
 
-        function closeDetails() {
-            document.getElementById('details-overlay').style.display = 'none';
-            const firstCard = document.querySelector('.card');
-            if(firstCard) firstCard.focus();
-        }
+async function eps(s, id, im, tm) {
+    document.getElementById('eps-list').innerHTML='<div style="color:white;grid-column:span 5;text-align:center">جاري التحميل...</div>';
+    const d = await fetch(`${BASE}/tv/${id}/season/${s}?api_key=${KEY}&language=ar-SA`).then(r=>r.json());
+    document.getElementById('eps-list').innerHTML=d.episodes.map(e=>`<div class="ep-btn" onclick="srv('${im}', '${tm}', ${s}, ${e.episode_number})">${e.episode_number}</div>`).join('');
+}
 
-        // 5. المسلسلات
-        async function loadSeasons(id) {
-            const res = await fetch(`${BASE_URL}/tv/${id}?api_key=${API_KEY}&language=ar-SA`);
-            const data = await res.json();
-            const list = document.getElementById('seasons-list');
-            list.innerHTML = '';
+// === السيرفرات (7 سيرفرات) ===
+function srv(im, tm, s, e) {
+    const m = document.getElementById('server-modal'); m.style.display='flex';
+    
+    // تجهيز الروابط
+    const u1 = s ? `https://player.autoembed.cc/embed/tv/${im}/${s}/${e}` 
+                 : `https://player.autoembed.cc/embed/movie/${im}`;
+    
+    const u2 = s ? `https://vidsrcme.su/embed/tv?imdb=${im}&season=${s}&episode=${e}&ds_lang=ar&lang=ar&sub=ar&caption=ar&autoplay=1` 
+                 : `https://vidsrcme.su/embed/movie?imdb=${im}&ds_lang=ar&lang=ar&sub=ar&caption=ar&autoplay=1`;
+    
+    const u3 = s ? `https://player.videasy.net/tv/${tm}/${s}/${e}` 
+                 : `https://player.videasy.net/movie/${tm}`;
 
-            data.seasons.forEach((s, index) => {
-                if (s.season_number > 0) {
-                    const chip = document.createElement('button');
-                    chip.className = 'chip nav-item';
-                    chip.innerText = `موسم ${s.season_number}`;
-                    chip.onclick = () => {
-                        document.querySelectorAll('#seasons-list .chip').forEach(c => c.style.background = '#333');
-                        chip.style.background = 'var(--primary)';
-                        loadEpisodes(id, s.season_number);
-                    };
-                    list.appendChild(chip);
-                    if(index === 0) {
-                        setTimeout(() => chip.click(), 100); 
-                        setTimeout(() => chip.focus(), 150); 
-                    }
-                }
-            });
-        }
+    const u4 = s ? `https://vidfast.pro/tv/${tm}/${s}/${e}?autoplay=1&sub=ar&lang=ar` 
+                 : `https://vidfast.pro/movie/${tm}?autoplay=1&sub=ar&lang=ar`;
 
-        async function loadEpisodes(id, sNum) {
-            const res = await fetch(`${BASE_URL}/tv/${id}/season/${sNum}?api_key=${API_KEY}&language=ar-SA`);
-            const data = await res.json();
-            const list = document.getElementById('episodes-list');
-            list.innerHTML = '';
+    const u5 = s ? `https://vidnest.fun/tv/${tm}/${s}/${e}?autoplay=1&sub=ar` 
+                 : `https://vidnest.fun/movie/${tm}?autoplay=1&lang=ar`;
 
-            data.episodes.forEach(ep => {
-                const chip = document.createElement('button');
-                chip.className = 'chip nav-item';
-                chip.innerText = `حلقة ${ep.episode_number}`;
-                chip.onclick = () => playVideo('tv', sNum, ep.episode_number);
-                list.appendChild(chip);
-            });
-        }
+    const u6 = s ? `https://vidlink.pro/tv/${tm}/${s}/${e}?primaryColor=white&secondaryColor=white&iconColor=white&title=false&poster=true&autoplay=true` 
+                 : `https://vidlink.pro/movie/${tm}?primaryColor=white&secondaryColor=white&iconColor=white&title=false&poster=true&autoplay=true`;
 
-        // 6. المشغل (تم التعديل: إخفاء الزر بعد 3 ثواني)
-        function playVideo(type, season, episode) {
-            const player = document.getElementById('fullscreen-player');
-            const iframe = document.getElementById('video-frame');
-            const closeBtn = document.getElementById('close-player');
-            
-            if (!appState.imdbId) { alert("عذراً، الرابط غير متوفر حالياً"); return; }
+    const u7 = s ? `https://player.autoembed.cc/embed/tv/${tm}/${s}/${e}?autoplay=true&download=true` 
+                 : `https://player.autoembed.cc/embed/movie/${tm}?autoplay=true&download=true`;
 
-            let url = `https://vidsrcme.su/embed/${type}?imdb=${appState.imdbId}&ds_lang=ar&lang=ar&sub=ar&caption=ar&quality=1080p`;
+    document.getElementById('server-list').innerHTML = `
+        <div class="srv-btn" onclick="play('${u1}')">سيرفر 1</div>
+        <div class="srv-btn" onclick="play('${u2}')">سيرفر 2</div>
+        <div class="srv-btn" onclick="play('${u3}')">سيرفر 3</div>
+        <div class="srv-btn" onclick="play('${u4}')">سيرفر 4</div>
+        <div class="srv-btn" onclick="play('${u5}')">سيرفر 5</div>
+        <div class="srv-btn" onclick="play('${u6}')">سيرفر 6</div>
+        <div class="srv-btn" onclick="play('${u7}')">سيرفر 7</div>`;
+}
 
-            if (type === 'tv') {
-                url += `&season=${season}&episode=${episode}`;
-            }
+function play(u) {
+    document.getElementById('server-modal').style.display='none';
+    const p = document.getElementById('player-overlay');
+    document.querySelector('iframe').src = u;
+    p.style.display='block';
+    history.pushState({v:'play'},'play');
+}
+function closePlayer() {
+    document.getElementById('player-overlay').style.display='none';
+    document.querySelector('iframe').src = '';
+    // الرجوع لصفحة التفاصيل
+    if(history.state && history.state.v === 'play') history.back();
+}
+function closeServer() { document.getElementById('server-modal').style.display='none'; }
 
-            player.style.display = 'block';
-            iframe.src = url;
-            closeBtn.focus();
+// === الحسابات ===
+function openAuth() { document.getElementById('auth-modal').style.display='flex'; toggleForms('login'); }
+function closeAuth() { document.getElementById('auth-modal').style.display='none'; }
+function toggleForms(t) {
+    document.getElementById('form-login').style.display = t=='login'?'block':'none';
+    document.getElementById('form-register').style.display = t=='register'?'block':'none';
+}
 
-            // منطق الإخفاء التلقائي
-            resetHideTimer();
+function registerUser() {
+    const n=document.getElementById('reg-name').value, e=document.getElementById('reg-email').value, p=document.getElementById('reg-pass').value;
+    if(!n||!e||!p) { alert("أدخل البيانات"); return; }
+    auth.createUserWithEmailAndPassword(e, p).then(cred => {
+        cred.user.updateProfile({displayName: n}).then(()=>{ alert("تم الحساب"); closeAuth(); });
+    }).catch(err=>alert("خطأ: "+err.message));
+}
+function loginUser() {
+    const e=document.getElementById('log-email').value, p=document.getElementById('log-pass').value;
+    auth.signInWithEmailAndPassword(e, p).then(()=>{ closeAuth(); }).catch(err=>alert("بيانات خاطئة"));
+}
+function doLogout() { auth.signOut().then(()=>location.reload()); }
 
-            // تتبع حركة الماوس أو اللمس لإعادة إظهار الزر
-            player.onmousemove = resetHideTimer;
-            player.ontouchstart = resetHideTimer;
-            document.onkeydown = resetHideTimer;
-        }
+// === المفضلة ===
+function openFavList() {
+    if(!currentUser) { openAuth(); return; }
+    document.getElementById('fav-view').style.display='block';
+    history.pushState({v:'fav'},'fav');
+    fillFav('movie'); fillFav('tv'); fillFav('anime');
+}
+function fillFav(t) {
+    const l = document.getElementById(t=='tv'?'fav-ser':(t=='movie'?'fav-mov':'fav-ani'));
+    l.innerHTML = (favs[t]&&favs[t].length)? favs[t].map(i=>`<div class="poster-card" onclick="openDet(${i.id},'${t}')"><img src="${IMG+i.p}"></div>`).join('') : '<div style="color:#777;padding:20px">فارغ</div>';
+}
+function checkFav(id, t) { return currentUser ? favs[t]?.some(x=>x.id==id) : false; }
+function togFav(id, t, ti, p, btn) {
+    if(!currentUser) { openAuth(); return; }
+    if(checkFav(id,t)) {
+        favs[t] = favs[t].filter(x=>x.id!=id);
+        btn.innerHTML = '+ إضافة للمفضلة'; btn.classList.remove('active');
+    } else {
+        if(!favs[t]) favs[t]=[];
+        favs[t].push({id:id, ti:ti, p:p});
+        btn.innerHTML = '✔ مضاف للمفضلة'; btn.classList.add('active');
+    }
+    localStorage.setItem('favs_'+currentUser.uid, JSON.stringify(favs));
+}
 
-        function resetHideTimer() {
-            const closeBtn = document.getElementById('close-player');
-            // إظهار الزر
-            closeBtn.classList.remove('hidden-btn');
-            
-            // إعادة ضبط المؤقت
-            clearTimeout(hideTimer);
-            hideTimer = setTimeout(() => {
-                // إخفاء الزر وجعله غير قابل للمس ليتمكن المستخدم من الضغط تحته
-                closeBtn.classList.add('hidden-btn');
-            }, 3000); // 3 ثواني
-        }
+// === التنقل ===
+function navTo(p, btn) {
+    if(btn) { document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    let t=''; 
+    if(p=='home')t='home-sec'; else if(p=='movies')t='movies-sec'; 
+    else if(p=='series')t='series-sec'; else if(p=='anime')t='anime-sec'; 
+    else if(p=='settings')t='settings-sec';
+    document.getElementById(t).classList.add('active');
+    if(curTab!=t) { history.pushState({v:'tab', t:t}, p); curTab=t; }
+}
 
-        function closePlayer() {
-            document.getElementById('fullscreen-player').style.display = 'none';
-            document.getElementById('video-frame').src = '';
-            clearTimeout(hideTimer); // إيقاف المؤقت عند الخروج
-            document.getElementById('btn-back').focus();
-        }
+function loadMore(cat) {
+    let t = cat=='movie'?'movie':'tv';
+    let u = cat=='anime' ? `/discover/tv?with_genres=16` : `/discover/${t}?sort_by=popularity.desc`;
+    // تصحيح ID الأفلام
+    let gridId = cat=='movie' ? 'all-movie-grid' : (cat=='series'?'all-series-grid':'all-anime-grid');
+    fetchData(`${u}&language=ar-SA&page=${pgs[cat]++}`, gridId, t, true);
+}
 
-        // 7. نظام تنقل ذكي
-        document.addEventListener('keydown', (e) => {
-            const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Backspace', 'Escape'];
-            if (!keys.includes(e.key)) return;
+function openSearch(){ document.getElementById('search-view').style.display='block'; history.pushState({v:'srch'},'srch'); }
+async function performSearch(){
+    // === تم تصحيح الخطأ هنا (searchInp بدلاً من searchInput) ===
+    const q=document.getElementById('searchInp').value;
+    const d=await fetch(`${BASE}/search/multi?api_key=${KEY}&language=ar-SA&query=${q}`).then(r=>r.json());
+    document.getElementById('srch-mov').innerHTML=d.results.filter(x=>x.media_type=='movie').map(i=>`<div class="poster-card" onclick="openDet(${i.id},'movie')"><img src="${IMG+i.poster_path}"></div>`).join('');
+    document.getElementById('srch-ser').innerHTML=d.results.filter(x=>x.media_type=='tv').map(i=>`<div class="poster-card" onclick="openDet(${i.id},'tv')"><img src="${IMG+i.poster_path}"></div>`).join('');
+}
+async function openNet(id, n) {
+    document.getElementById('net-view').style.display='block';
+    document.getElementById('net-tit').innerText=n;
+    history.pushState({v:'net'},'net');
+    fetchData(`/discover/movie?with_networks=${id}&language=ar-SA`, 'net-mov', 'movie');
+    fetchData(`/discover/tv?with_networks=${id}&language=ar-SA`, 'net-ser', 'tv');
+}
 
-            // إذا كنا في المشغل، أي ضغطة زر تعيد ظهور الزر
-            if(document.getElementById('fullscreen-player').style.display === 'block') {
-                resetHideTimer();
-            }
-
-            e.preventDefault(); 
-
-            const current = document.activeElement;
-            const modalOpen = document.getElementById('details-overlay').style.display === 'block';
-            const playerOpen = document.getElementById('fullscreen-player').style.display === 'block';
-
-            if (e.key === 'Backspace' || e.key === 'Escape') {
-                if (playerOpen) closePlayer();
-                else if (modalOpen) closeDetails();
-                return;
-            }
-
-            if (e.key === 'Enter') {
-                current.click();
-                return;
-            }
-
-            let scopeSelector = '';
-            if (playerOpen) {
-                scopeSelector = '#fullscreen-player .nav-item';
-            } else if (modalOpen) {
-                scopeSelector = '#details-overlay .nav-item';
-            } else {
-                scopeSelector = 'body > .nav-item, #top-nav .nav-item, #hero .nav-item, #resultsGrid .nav-item';
-            }
-
-            let items = Array.from(document.querySelectorAll(scopeSelector))
-                             .filter(el => el.offsetParent !== null);
-            
-            let index = items.indexOf(current);
-            if (index === -1 && items.length > 0) {
-                items[0].focus();
-                return;
-            }
-
-            let nextIndex = index;
-
-            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                const move = (e.key === 'ArrowLeft') ? 1 : -1;
-                nextIndex = index + move;
-            } 
-            else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                const inScrollRow = current.parentElement.classList.contains('scroll-row');
-                
-                if (inScrollRow) {
-                    if (e.key === 'ArrowDown') {
-                        const episodes = document.querySelectorAll('#episodes-list .chip');
-                        if (episodes.length > 0) {
-                            episodes[0].focus();
-                            episodes[0].scrollIntoView({block: 'center', inline: 'center'});
-                            return;
-                        }
-                    } 
-                    else if (e.key === 'ArrowUp') {
-                         document.getElementById('btn-back').focus();
-                         return;
-                    }
-                } 
-                
-                if (!modalOpen && !playerOpen) {
-                    const gridCols = window.innerWidth > 768 ? 5 : 3; 
-                    if (current.parentElement.id === 'top-nav' || current.parentElement.id === 'hero') {
-                        if(e.key === 'ArrowDown') {
-                             const firstCard = document.querySelector('.card');
-                             if(firstCard) { firstCard.focus(); return; }
-                        }
-                    } else {
-                        const move = (e.key === 'ArrowDown') ? gridCols : -gridCols;
-                        nextIndex = index + move;
-                    }
-                } else {
-                    if (!inScrollRow) {
-                        nextIndex = (e.key === 'ArrowDown') ? index + 1 : index - 1;
-                    }
-                }
-            }
-
-            if (nextIndex >= 0 && nextIndex < items.length) {
-                const target = items[nextIndex];
-                target.focus();
-                target.classList.add('focused');
-                current.classList.remove('focused');
-                target.scrollIntoView({behavior: "smooth", block: "center", inline: "center"});
-            }
-        });
-
-    </script>
+function goBack(){ history.back(); }
+window.onpopstate = function(e) {
+    if(document.getElementById('server-modal').style.display=='flex') { document.getElementById('server-modal').style.display='none'; return; }
+    if(document.getElementById('player-overlay').style.display=='block') { document.getElementById('player-overlay').style.display='none'; document.querySelector('iframe').src=''; return; }
+    document.querySelectorAll('.full-view').forEach(v=>v.style.display='none');
+    if(e.state && e.state.v=='tab') {
+        document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+        document.getElementById(e.state.t).classList.add('active');
+        curTab = e.state.t;
+    }
+}
+</script>
 </body>
 </html>
-
